@@ -12,6 +12,7 @@ Usage:
 
 import os
 import sys
+import json
 import argparse
 import webbrowser
 from pathlib import Path
@@ -24,14 +25,14 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 from ocs_client import OCSClient
 from dashboard_generator import DashboardGenerator
 from models import Session
-from data_utils import create_timestamped_data_dir, move_existing_data_to_timestamped_folder, list_data_directories, get_data_directory_info
+from data_utils import create_timestamped_data_dir, list_data_directories, get_data_directory_info
 import constants
 
 
 
-def download_data(limit=None):
-    """Download all session data to data directory."""
-    print("OCS Data Download")
+def download_sessions(limit=None):
+    """Download session metadata to data directory."""
+    print("OCS Session Download")
     print("=" * 50)
     
     # Load environment variables
@@ -58,7 +59,7 @@ def download_data(limit=None):
         print("Connecting to OpenChatStudio API...")
         
         # Move existing data to timestamped folder if any exists
-        move_existing_data_to_timestamped_folder()
+
         
         # Create new timestamped data directory
         timestamped_dir = create_timestamped_data_dir()
@@ -131,6 +132,110 @@ def download_data(limit=None):
         traceback.print_exc()
         return 1
 
+def download_messages(limit=None):
+    """Download message content for existing sessions."""
+    print("OCS Messages Download")
+    print("=" * 50)
+    
+    # Load environment variables
+    load_dotenv()
+    
+    # Check for required environment variables
+    api_key = os.getenv('OCS_API_KEY')
+    if not api_key:
+        print("Error: OCS_API_KEY environment variable is required")
+        print("Please create a .env file with your API key")
+        return 1
+    
+    # Initialize API client
+    base_url = os.getenv('OCS_API_BASE_URL', constants.DEFAULT_API_BASE_URL)
+    project_id = os.getenv('OCS_PROJECT_ID')
+    
+    print(f"API Base URL: {base_url}")
+    if project_id:
+        print(f"Project ID: {project_id}")
+    
+    client = OCSClient(api_key, base_url, project_id)
+    
+    try:
+        # Find the latest sessions directory
+        from data_utils import get_latest_sessions_dir
+        sessions_dir = get_latest_sessions_dir()
+        
+        if not sessions_dir:
+            print("Error: No session data found. Please run 'download-sessions' first.")
+            return 1
+        
+        print(f"Loading sessions from: {sessions_dir}")
+        
+        # Load existing sessions
+        session_files = list(sessions_dir.glob("session_*.json"))
+        if limit:
+            session_files = session_files[:limit]
+            print(f"Found {len(session_files)} session files (limited to {limit})")
+        else:
+            print(f"Found {len(session_files)} session files")
+        
+        if not session_files:
+            print("No session files found. Please run 'download-sessions' first.")
+            return 1
+        
+        # Create messages directory
+        messages_dir = sessions_dir.parent / "messages"
+        messages_dir.mkdir(exist_ok=True)
+        
+        print(f"Messages will be saved to: {messages_dir}")
+        
+        # Download messages for each session
+        downloaded_count = 0
+        skipped_count = 0
+        error_count = 0
+        
+        for i, session_file in enumerate(session_files):
+            try:
+                # Extract session ID from filename
+                session_id = session_file.stem.replace('session_', '')
+                
+                # Check if messages already exist
+                message_file = messages_dir / f"messages_{session_id}.json"
+                if message_file.exists():
+                    skipped_count += 1
+                    continue
+                
+                print(f"Downloading messages for session {i+1}/{len(session_files)}: {session_id}")
+                
+                # Fetch session details with messages
+                session_detail = client.get_session_details(session_id)
+                
+                # Save messages to file
+                with open(message_file, 'w', encoding='utf-8') as f:
+                    json.dump(session_detail, f, indent=2, ensure_ascii=False)
+                
+                downloaded_count += 1
+                
+                # Progress update every 10 sessions
+                if (i + 1) % 10 == 0:
+                    print(f"  Progress: {i+1}/{len(session_files)} sessions processed")
+                
+            except Exception as e:
+                print(f"  Warning: Failed to download messages for {session_id}: {e}")
+                error_count += 1
+        
+        # Summary
+        print("\nMessage download complete!")
+        print(f"Downloaded: {downloaded_count}")
+        print(f"Skipped (already exist): {skipped_count}")
+        print(f"Errors: {error_count}")
+        print(f"Location: {messages_dir}")
+        
+        return 0
+        
+    except Exception as e:
+        print(f"Error downloading messages: {e}")
+        import traceback
+        traceback.print_exc()
+        return 1
+
 def generate_dashboard():
     """Generate dashboard from existing or fresh data."""
     print("OCS Dashboard Generator")
@@ -192,16 +297,17 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python run_dashboard.py                    # Generate dashboard
-  python run_dashboard.py download           # Download all session data
-  python run_dashboard.py download --limit 100  # Download first 100 sessions
+  python run_dashboard.py                           # Generate dashboard
+  python run_dashboard.py download-sessions         # Download session metadata
+  python run_dashboard.py download-sessions --limit 100  # Download first 100 sessions
+  python run_dashboard.py download-messages         # Download message content for existing sessions
         """
     )
     
     parser.add_argument(
         'command', 
         nargs='?', 
-        choices=['download', 'generate'],
+        choices=['download-sessions', 'download-messages', 'generate'],
         default='generate',
         help='Command to run (default: generate)'
     )
@@ -209,14 +315,16 @@ Examples:
     parser.add_argument(
         '--limit',
         type=int,
-        help='Limit number of sessions to download (only for download command)'
+        help='Limit number of sessions to process (for download-sessions and download-messages commands)'
     )
     
     args = parser.parse_args()
     
     # Route to appropriate function
-    if args.command == 'download':
-        return download_data(args.limit)
+    if args.command == 'download-sessions':
+        return download_sessions(args.limit)
+    elif args.command == 'download-messages':
+        return download_messages(args.limit)
     else:  # generate or default
         return generate_dashboard()
 

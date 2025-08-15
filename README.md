@@ -29,29 +29,42 @@ Static dashboard generator for OpenChatStudio data. This project analyzes AI coa
 
 ### 3. **Download Data**
    ```bash
-   # Download all session data to timestamped data directory
-   python run_dashboard.py download
+   # Download session metadata only
+   python run_dashboard.py download-sessions
    
-   # Download limited sessions for testing
-   python run_dashboard.py download --limit 1000
+   # Download session metadata (limited for testing)
+   python run_dashboard.py download-sessions --limit 1000
+   
+   # Download message content for existing sessions (required for advanced metrics)
+   python run_dashboard.py download-messages
+   
+   # Download messages for limited sessions
+   python run_dashboard.py download-messages --limit 100
    ```
 
 ### 4. **Generate Dashboard**
    ```bash
-   # Generate dashboard from downloaded data
-   python run_dashboard.py
+   # Generate interactive dashboard from downloaded data
+   python run_dashboard.py generate
    ```
 
 The dashboard will be generated in the `output/index.html` file and automatically opened in your browser.
 
 ## Dashboard Features
 
-### ✅ **Current Metrics Available**
-- **Session Overview**: Total sessions, experiments count, teams count, date ranges
-- **Session Trends**: Sessions over time line chart
-- **Experiment Analysis**: Sessions by experiment (horizontal bar chart)
-- **Team Distribution**: Sessions by team (pie chart)
-- **Annotation Analysis**: Quality tags when available in session data
+### 🎯 **Interactive Filtering**
+- **Experiment Selection**: Multi-select experiments with session counts
+- **Version Filtering**: Dynamic version selection per experiment with descriptions
+- **Smart Defaults**: Auto-select all versions when choosing an experiment
+- **Empty State**: Start with no data selected, requiring active filtering
+- **Real-time Updates**: Metrics update instantly as filters change
+
+### 📊 **Advanced Metrics Cards**
+- **Session Analytics**: Total sessions, experiments, teams, date ranges
+- **Message Analysis**: Total messages, median words per user/bot response
+- **Sentiment Detection**: Appreciation/dissatisfaction rates from message content
+- **Quality Assessment**: Annotated sessions, coaching quality, bot performance
+- **Version-Aware**: All metrics calculated using actual version tags from messages
 
 ### ✅ **Available Data**
 - **Session Metadata**: IDs, timestamps, participant info, experiment details
@@ -66,10 +79,10 @@ The dashboard will be generated in the `output/index.html` file and automaticall
 - **Content Quality**: `safe`, `accurate`
 - **User Knowledge**: `user_knowledge_good`, `user_knowledge_bad`
 
-### ❌ **Currently Not Available** (Requires Additional API Calls)
-- FLW ratings (1-5 scale)
-- Message content and word counts
-- Detailed conversation analysis
+### ❌ **Currently Not Available**
+- FLW ratings (1-5 scale) - requires additional API endpoints
+- Advanced conversation analysis - requires NLP processing
+- Historical trend charts - focus is on metric cards for now
 
 ## Configuration
 

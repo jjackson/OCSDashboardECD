@@ -72,3 +72,6 @@ logs/
 tmp/
 temp/
 .tmp/
+
+# Cloned repositories
+ocs-session-stats/

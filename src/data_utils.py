@@ -55,45 +55,6 @@ def get_latest_sessions_dir() -> Optional[Path]:
             return sessions_dir
     return None
 
-
-def move_existing_data_to_timestamped_folder() -> bool:
-    """Move existing data folders to a timestamped folder"""
-    data_dir = Path(constants.DATA_DIR)
-    
-    # Check if there are any non-timestamped folders to move
-    folders_to_move = []
-    if data_dir.exists():
-        for item in data_dir.iterdir():
-            if item.is_dir() and not _is_timestamp_format(item.name):
-                folders_to_move.append(item)
-    
-    if not folders_to_move:
-        print("No existing data folders found to move.")
-        return False
-    
-    # Create a timestamped folder for existing data
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S") + "_migrated"
-    timestamped_dir = data_dir / timestamp
-    timestamped_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Move folders
-    moved_count = 0
-    for folder in folders_to_move:
-        try:
-            destination = timestamped_dir / folder.name
-            shutil.move(str(folder), str(destination))
-            print(f"Moved {folder.name} to {timestamped_dir.name}/")
-            moved_count += 1
-        except Exception as e:
-            print(f"Warning: Could not move {folder.name}: {e}")
-    
-    if moved_count > 0:
-        print(f"Successfully moved {moved_count} folders to {timestamped_dir}")
-        return True
-    
-    return False
-
-
 def list_data_directories() -> List[Path]:
     """List all timestamped data directories, sorted by most recent first"""
     data_dir = Path(constants.DATA_DIR)
@@ -197,6 +158,55 @@ def load_sessions_from_directory(sessions_dir: Path) -> List[dict]:
             print(f"Warning: Could not load {json_file.name}: {e}")
     
     return sessions
+
+
+def get_latest_messages_dir() -> Optional[Path]:
+    """Get the messages directory from the most recent timestamped data directory"""
+    latest_data_dir = get_latest_data_dir()
+    if latest_data_dir:
+        messages_dir = latest_data_dir / "messages"
+        if messages_dir.exists():
+            return messages_dir
+    return None
+
+
+def load_messages_from_directory(messages_dir: Path) -> List[dict]:
+    """Load all message data from JSON files in a directory"""
+    messages = []
+    
+    if not messages_dir.exists():
+        return messages
+    
+    json_files = list(messages_dir.glob("messages_*.json"))
+    print(f"Loading {len(json_files)} message files from {messages_dir}")
+    
+    for json_file in json_files:
+        try:
+            with open(json_file, 'r', encoding='utf-8') as f:
+                message_data = json.load(f)
+                messages.append(message_data)
+        except Exception as e:
+            print(f"Warning: Could not load {json_file.name}: {e}")
+    
+    return messages
+
+
+def load_sessions_with_messages() -> tuple[List[dict], List[dict]]:
+    """Load both session metadata and message content from the latest data directory"""
+    sessions = []
+    messages = []
+    
+    # Load sessions
+    sessions_dir = get_latest_sessions_dir()
+    if sessions_dir:
+        sessions = load_sessions_from_directory(sessions_dir)
+    
+    # Load messages
+    messages_dir = get_latest_messages_dir()
+    if messages_dir:
+        messages = load_messages_from_directory(messages_dir)
+    
+    return sessions, messages
 
 
 def get_latest_data_summary() -> Optional[dict]:
