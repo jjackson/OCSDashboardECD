@@ -87,7 +87,6 @@ def main():
             env_content = """# OpenChatStudio API Configuration
 OCS_API_KEY=your_api_key_here
 OCS_API_BASE_URL=https://chatbots.dimagi.com/api
-OCS_PROJECT_ID=your_project_id_here
 """
             env_file.write_text(env_content)
             print("✅ .env template created - please edit it with your API key")
